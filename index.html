@@ -122,12 +122,13 @@
         /* Search Section */
         .search-box {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             margin-bottom: 14px;
+            flex-wrap: wrap;
         }
 
         .input-group {
-            flex: 1;
+            flex: 1 1 280px;
             position: relative;
             display: flex;
             align-items: center;
@@ -159,7 +160,7 @@
         }
 
         .btn-search {
-            padding: 14px 28px;
+            padding: 14px 24px;
             background: linear-gradient(135deg, #2563eb, #1d4ed8);
             color: white;
             border: none;
@@ -172,6 +173,7 @@
             align-items: center;
             gap: 8px;
             box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+            white-space: nowrap;
         }
 
         .btn-search:hover {
@@ -179,8 +181,26 @@
             box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
         }
 
-        .btn-search:active {
-            transform: translateY(0);
+        .btn-gps {
+            padding: 14px 20px;
+            background: linear-gradient(135deg, #0ea5e9, #0284c7);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+            white-space: nowrap;
+        }
+
+        .btn-gps:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(14, 165, 233, 0.45);
         }
 
         /* Suggestions Chips */
@@ -414,7 +434,8 @@
             .search-box {
                 flex-direction: column;
             }
-            .btn-search {
+            .btn-search, .btn-gps {
+                width: 100%;
                 justify-content: center;
             }
         }
@@ -449,6 +470,9 @@
                 </div>
                 <button id="btnCari" class="btn-search">
                     <span>Cari Data</span> 🔍
+                </button>
+                <button id="btnGPS" type="button" class="btn-gps" title="Deteksi lokasi saat ini via GPS">
+                    <span>🧭 Lokasi Saya</span>
                 </button>
             </div>
 
@@ -569,7 +593,6 @@
         let marker = null;
 
         function initMap() {
-            // Default center: Indonesia
             map = L.map('map').setView([-2.5489, 118.0149], 5);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
@@ -589,7 +612,7 @@
         }
 
         // Fungsi fetch data cuaca & geocoding
-        async function fetchWeatherData(lokasiQuery) {
+        async function fetchWeatherData(urlParams) {
             const loading = document.getElementById("loadingIndicator");
             const result = document.getElementById("resultContent");
             const alertError = document.getElementById("alertError");
@@ -598,9 +621,8 @@
             loading.style.display = "block";
             result.style.opacity = "0.4";
 
-            // Deteksi otomatis URL backend: jika dibuka via Live Server (port bukan 3000), arahkan ke localhost:3000
             const baseUrl = window.location.port === "3000" ? "" : "http://localhost:3000";
-            const endpoint = `${baseUrl}/api/lokasi?kota=${encodeURIComponent(lokasiQuery)}`;
+            const endpoint = `${baseUrl}/api/lokasi?${urlParams}`;
 
             try {
                 const response = await fetch(endpoint);
@@ -620,7 +642,7 @@
                 document.getElementById("displayKelembaban").innerText = resData.kelembaban !== null ? `${resData.kelembaban}%` : "-";
                 document.getElementById("displayAngin").innerText = resData.kecepatan_angin !== null ? resData.kecepatan_angin : "-";
 
-                // Update Grid Data (Sesuai Instruksi Praktikum)
+                // Update Grid Data
                 document.getElementById("valNegara").innerText = resData.negara || "-";
                 document.getElementById("valProvinsi").innerText = resData.provinsi || "-";
                 document.getElementById("valKecamatan").innerText = resData.kecamatan || "-";
@@ -646,14 +668,14 @@
         // Tombol Preset Cepat
         function searchPreset(nama) {
             document.getElementById("inputLokasi").value = nama;
-            fetchWeatherData(nama);
+            fetchWeatherData(`kota=${encodeURIComponent(nama)}`);
         }
 
         // Event Listener Tombol Cari & Enter
         document.getElementById("btnCari").addEventListener("click", () => {
             const query = document.getElementById("inputLokasi").value.trim();
             if (query) {
-                fetchWeatherData(query);
+                fetchWeatherData(`kota=${encodeURIComponent(query)}`);
             }
         });
 
@@ -661,16 +683,38 @@
             if (e.key === "Enter") {
                 const query = document.getElementById("inputLokasi").value.trim();
                 if (query) {
-                    fetchWeatherData(query);
+                    fetchWeatherData(`kota=${encodeURIComponent(query)}`);
                 }
             }
+        });
+
+        // Deteksi GPS Perangkat
+        document.getElementById("btnGPS").addEventListener("click", () => {
+            if (!navigator.geolocation) {
+                alert("Browser tidak mendukung geolokasi GPS.");
+                return;
+            }
+            document.getElementById("alertError").style.display = "none";
+            document.getElementById("loadingIndicator").style.display = "block";
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lon = pos.coords.longitude;
+                    document.getElementById("inputLokasi").value = `Koordinat: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+                    fetchWeatherData(`lat=${lat}&lon=${lon}`);
+                },
+                (err) => {
+                    document.getElementById("loadingIndicator").style.display = "none";
+                    document.getElementById("alertError").innerText = `⚠️ Gagal mengakses GPS: ${err.message}`;
+                    document.getElementById("alertError").style.display = "block";
+                }
+            );
         });
 
         // Inisialisasi awal saat halaman dimuat
         window.addEventListener("DOMContentLoaded", () => {
             initMap();
-            // Load data default awal
-            fetchWeatherData("Kasihan");
+            fetchWeatherData("kota=Kasihan");
         });
     </script>
 </body>

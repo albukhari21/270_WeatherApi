@@ -40,9 +40,20 @@ function getWeatherDescription(code) {
 }
 
 app.get("/api/lokasi", async (req, res) => {
-  const kota = req.query.kota || "Jakarta";
+  const kota = req.query.kota;
+  const latQuery = req.query.lat;
+  const lonQuery = req.query.lon;
   const apiKey = "TmW3n2IbOKaZxkghOoYB";
-  const url = `https://api.maptiler.com/geocoding/${encodeURIComponent(kota)}.json?key=${apiKey}`;
+
+  let url = "";
+  if (latQuery && lonQuery) {
+    // Reverse geocoding berdasarkan koordinat latitude & longitude
+    url = `https://api.maptiler.com/geocoding/${encodeURIComponent(lonQuery)},${encodeURIComponent(latQuery)}.json?key=${apiKey}`;
+  } else {
+    // Forward geocoding berdasarkan nama kota/lokasi
+    const targetKota = kota || "Jakarta";
+    url = `https://api.maptiler.com/geocoding/${encodeURIComponent(targetKota)}.json?key=${apiKey}`;
+  }
 
   try {
     const response = await axios.get(url);
@@ -52,7 +63,7 @@ app.get("/api/lokasi", async (req, res) => {
     if (!feature) {
       return res.status(404).json({
         status: "error",
-        message: `Lokasi '${kota}' tidak ditemukan.`
+        message: `Lokasi '${kota || `${latQuery},${lonQuery}`}' tidak ditemukan.`
       });
     }
 
@@ -109,8 +120,8 @@ app.get("/api/lokasi", async (req, res) => {
 
     return res.json({
       status: "success",
-      query: kota,
-      lokasi: feature.place_name || feature.text || kota,
+      query: kota || `${lat}, ${lon}`,
+      lokasi: feature.place_name || feature.text || (kota || "Lokasi Saat Ini"),
       kota: feature.text || kota,
       negara,
       provinsi,
